@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: web-local
+
+commonLabels:
+  environment: local
+  managed.by: kustomize
+
+images:
+  - name: stefanprodan/podinfo
+    newTag: 6.0.0
+
+replicas:
+  - name: app
+    count: 5
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+replacements:
+  - source:
+      kind: Deployment
+      fieldPath: metadata.labels.environment
+    targets:
+      - select:
+          kind: Namespace
+        fieldPaths:
+          - metadata.name
+
+configMapGenerator:
+  - name: configmap
+    behavior: create
+    literals:
+      - MY_ENV_VAR=1
+      - FOO=bar
+      - AWESOME=great
+
+secretGenerator:
+  - name: secret
+    behavior: create
+    envs:
+      - secret.env
+
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/type
+        value: NodePort
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30091
+      - op: add
+        path: /spec/ports/0/targetPort
+        value: http
+    target:
+      kind: Service
+      name: app-service
+
+  - path: deployment.patch.yaml
+    target:
+      kind: Deployment
+      name: app
